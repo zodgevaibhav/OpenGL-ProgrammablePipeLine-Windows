@@ -1,0 +1,1 @@
+cl /EHsc TemplateUsingNativeWindow.cpp /link user32.lib /link gdi32.lib
