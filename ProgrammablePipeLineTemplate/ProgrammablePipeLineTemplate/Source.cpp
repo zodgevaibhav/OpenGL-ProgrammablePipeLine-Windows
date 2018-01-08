@@ -1,6 +1,8 @@
 #include <windows.h>
 
 //OpenGL headers
+#include<GL/glew.h>
+
 #include <gl/GL.h>
 #include <gl/GLU.h>
 
@@ -8,6 +10,7 @@
 #define WIN_HEIGHT 600
 
 // import libraries
+#pragma comment(lib,"glew32.lib")
 #pragma comment(lib,"opengl32.lib")
 #pragma comment(lib,"glu32.lib")
 
@@ -238,6 +241,15 @@ void initialize(void)
 	}
 
 	if (wglMakeCurrent(ghdc, ghrc) == false)
+	{
+		wglDeleteContext(ghrc);
+		ghrc = NULL;
+		ReleaseDC(ghwnd, ghdc);
+		ghdc = NULL;
+	}
+
+	GLenum glewError = glewInit();
+	if (glewError != GLEW_OK)
 	{
 		wglDeleteContext(ghrc);
 		ghrc = NULL;
