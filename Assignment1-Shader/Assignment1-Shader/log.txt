@@ -1,0 +1,4 @@
+***** File created successfull.
+Shader Program Link Log : Vertex shader does not write to gl_Position.
+Out of resource error.
+
