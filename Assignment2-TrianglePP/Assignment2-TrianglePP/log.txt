@@ -1,7 +1,4 @@
 ***** File created successfull.
-Shader Program Link Log : Vertex shader does not write to gl_Position.
-Out of resource error.
-
 Shader Program Link Log : GL_EXT_blend_minmax
 Shader Program Link Log : GL_EXT_blend_subtract
 Shader Program Link Log : GL_EXT_blend_color
@@ -218,3 +215,4 @@ Shader Program Link Log : WGL_EXT_create_context_es_profile
 Shader Program Link Log : WGL_EXT_create_context_es2_profile
 Shader Program Link Log : WGL_NV_DX_interop
 Shader Program Link Log : WGL_ARB_create_context_robustness
+Log file closing successfully

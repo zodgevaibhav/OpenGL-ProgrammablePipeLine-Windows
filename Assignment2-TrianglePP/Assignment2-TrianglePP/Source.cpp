@@ -55,7 +55,7 @@ GLuint gVao;
 GLuint gVbo;
 GLuint gMVPUniform;
 //
-//mat4 gOrthographicProjectionMatrix;
+mat4 gOrthographicProjectionMatrix;
 
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, int iCmdShow)
@@ -102,7 +102,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
 	// create window
 	hwnd = CreateWindowEx(WS_EX_APPWINDOW,
 		szClassName,
-		TEXT("Programmable Pipeline Template"),
+		TEXT("Programmable Pipeline Triangle"),
 		WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE,
 		100,
 		100,
@@ -302,15 +302,20 @@ void initialize(void)
 	gVertexShaderObject = glCreateShader(GL_VERTEX_SHADER);
 
 	const GLchar *vertexShaderSourceCode =
+		"#version 430 core"\
+		"\n"\
+		"in vec4 vPosition;"\
+		"uniform mat4 u_mvp_matrix;"\
 		"void main(void)" \
 		"{" \
+		"gl_Position=u_mvp_matrix * vPosition;"
 		"}";
 
 	glShaderSource(gVertexShaderObject, 1, (const GLchar **)&vertexShaderSourceCode, NULL);
 
 	//******************* Compile Vertex shader 
 	glCompileShader(gVertexShaderObject);
-	
+
 	GLint iInfoLogLength = 0;
 	GLint iShaderCompiledStatus = 0;
 	char *szInfoLog = NULL;
@@ -337,14 +342,18 @@ void initialize(void)
 	gFragmentShaderObject = glCreateShader(GL_FRAGMENT_SHADER);
 
 	const GLchar *fragmentShaderSourceCode =
+		"#version 430 core"\
+		"\n"\
+		"out vec4 FragColor;"
 		"void main(void)" \
 		"{" \
+		"FragColor=vec4(1.0,1.0,1.0,1.0);"\
 		"}";
 
 	glShaderSource(gFragmentShaderObject, 1, (const GLchar **)&fragmentShaderSourceCode, NULL);
-	
+
 	//******************* Compile fragment shader 
-	
+
 	glCompileShader(gFragmentShaderObject);
 	glGetShaderiv(gFragmentShaderObject, GL_COMPILE_STATUS, &iShaderCompiledStatus);
 	if (iShaderCompiledStatus == GL_FALSE)
@@ -374,7 +383,7 @@ void initialize(void)
 	glAttachShader(gShaderProgramObject, gVertexShaderObject);
 
 	// attach fragment shader to shader program
-	glAttachShader(gShaderProgramObject	, gFragmentShaderObject);
+	glAttachShader(gShaderProgramObject, gFragmentShaderObject);
 
 	//**************************************** Link Shader program **********************************************
 	glLinkProgram(gShaderProgramObject);
@@ -400,11 +409,30 @@ void initialize(void)
 
 	//**************************************** END Link Shader program **********************************************
 
+	gMVPUniform = glGetUniformLocation(gShaderProgramObject,"u_mvp_matrix");
+
+	const GLfloat triangleVertices[] =
+	{ 0.0f,50.0f,0.0f,
+	-50.0f,-50.0f,0.0f,
+	50.0f,-50.0f,0.0f
+	};
+
+	glGenVertexArrays(1, &gVbo);
+	glBindVertexArray(gVao);
+
+	glGenBuffers(1, &gVbo);
+	glBindBuffer(GL_ARRAY_BUFFER, gVbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(triangleVertices), triangleVertices, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(VDG_ATTRIBUTE_VERTEX, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+
+	glEnableVertexAttribArray(VDG_ATTRIBUTE_VERTEX);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
 
 	//*************************************************
 	printOpenGlExtentions();
-
-	
 
 	glShadeModel(GL_SMOOTH);
 
@@ -414,7 +442,9 @@ void initialize(void)
 	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 	glEnable(GL_CULL_FACE);
 
-	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	glClearColor(0.0f, 0.0f, 1.0f, 0.0f);
+
+	gOrthographicProjectionMatrix = mat4::identity();
 
 	resize(WIN_WIDTH, WIN_HEIGHT);
 }
@@ -427,10 +457,11 @@ void resize(int width, int height)
 
 	glViewport(0, 0, (GLsizei)width, (GLsizei)height);
 
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
+	if (width <= height)
+		gOrthographicProjectionMatrix = ortho(-100.0f,100.0f,(-100.0f*(height/width)),(100.0f*(height/width)),-100.0f,100.0f);
+	else
+		gOrthographicProjectionMatrix = ortho(-100.0f, 100.0f, (-100.0f*(width/height )), (100.0f*(width / height)), -100.0f, 100.0f);
 
-	gluPerspective(45.0f, (GLfloat)width / (GLfloat)height, 0.1f, 100.0f);
 }
 
 void display(void)
@@ -439,6 +470,18 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glUseProgram(gShaderProgramObject);
+
+	mat4 modelViewMatrix = mat4::identity();
+	mat4 modelViewProjectionMatrix = mat4::identity();
+	modelViewProjectionMatrix = gOrthographicProjectionMatrix*modelViewMatrix;
+
+	glUniformMatrix4fv(gMVPUniform,1,GL_FALSE,modelViewProjectionMatrix);
+
+	glBindVertexArray(gVao);
+
+	glDrawArrays(GL_TRIANGLES,0,3);
+
+	glBindVertexArray(0);
 
 	glUseProgram(0);
 
@@ -460,10 +503,22 @@ void uninitialize(void)
 		ShowCursor(TRUE);
 	}
 
+	if (gVao)
+	{
+		glDeleteVertexArrays(1, &gVao);
+		gVao = 0;
+	}
+
+	if (gVbo)
+	{
+		glDeleteBuffers(1, &gVbo);
+		gVbo = 0;
+	}
+
 	glDetachShader(gShaderProgramObject, gVertexShaderObject);
 	glDetachShader(gShaderProgramObject, gFragmentShaderObject);
 
-	
+
 	glDeleteShader(gVertexShaderObject);
 	gVertexShaderObject = 0;
 
@@ -482,6 +537,13 @@ void uninitialize(void)
 
 	ReleaseDC(ghwnd, ghdc);
 	ghdc = NULL;
+
+	if (gpFile)
+	{
+		fprintf(gpFile, "Log file closing successfully\n");
+		fclose(gpFile);
+		gpFile = NULL;
+	}
 
 	DestroyWindow(ghwnd);
 }

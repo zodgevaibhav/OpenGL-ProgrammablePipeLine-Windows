@@ -1,4 +1,5 @@
 #include <windows.h>
+#include<stdio.h>
 
 //OpenGL headers
 #include<GL/glew.h>
@@ -27,6 +28,7 @@ bool gbActiveWindow = false;
 bool gbEscapeKeyIsPressed = false;
 bool gbFullscreen = false;
 
+int printOpenGlExtentions(void);
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, int iCmdShow)
 {
@@ -257,6 +259,8 @@ void initialize(void)
 		ghdc = NULL;
 	}
 
+	printOpenGlExtentions();
+
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
 	glShadeModel(GL_SMOOTH);
@@ -315,4 +319,19 @@ void uninitialize(void)
 	ghdc = NULL;
 
 	DestroyWindow(ghwnd);
+}
+
+int printOpenGlExtentions(void)
+{
+	GLint num;
+
+	glGetIntegerv(GL_NUM_EXTENSIONS, &num);
+
+	for (int i = 0; i < num; i++)
+	{
+		printf(" \n %s", glGetStringi(GL_EXTENSIONS, i));
+	}
+
+
+	return 0;
 }
