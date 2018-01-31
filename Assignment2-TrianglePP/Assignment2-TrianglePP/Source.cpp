@@ -400,9 +400,9 @@ void initialize(void)
 				GLsizei written;
 				glGetProgramInfoLog(gShaderProgramObject, iInfoLogLength, &written, szInfoLog);
 				fprintf(gpFile, "Shader Program Link Log : %s\n", szInfoLog);
-				//free(szInfoLog);
-				//uninitialize();
-				//exit(0);
+				free(szInfoLog);
+				uninitialize();
+				exit(0);
 			}
 		}
 	}
@@ -412,7 +412,7 @@ void initialize(void)
 	gMVPUniform = glGetUniformLocation(gShaderProgramObject,"u_mvp_matrix");
 
 	const GLfloat triangleVertices[] =
-	{ 0.0f,50.0f,0.0f,
+	{ 0.0f,50.0f,0.0f, //0
 	-50.0f,-50.0f,0.0f,
 	50.0f,-50.0f,0.0f
 	};

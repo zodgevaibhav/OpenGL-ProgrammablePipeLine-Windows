@@ -103,7 +103,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
 	// create window
 	hwnd = CreateWindowEx(WS_EX_APPWINDOW,
 		szClassName,
-		TEXT("PP:MultiColorTriangle"),
+		TEXT("PP:Perspective Triangle"),
 		WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE,
 		100,
 		100,
@@ -348,8 +348,7 @@ void initialize(void)
 	const GLchar *fragmentShaderSourceCode =
 		"#version 430 core"\
 		"\n"\
-		"in vec4 vPosition;"\
-		"in vec4 outColor;"\
+		"in vec4 outColor;"
 		"out vec4 FragColor;"
 		"void main(void)" \
 		"{" \
@@ -423,12 +422,11 @@ void initialize(void)
 		1.0f,-1.0f,0.0f
 	};
 
-	glGenVertexArrays(1, &gVao);
+	glGenVertexArrays(1, &gVbo_position);
 	glBindVertexArray(gVao);
 
 	glGenBuffers(1, &gVbo_position);
 	glBindBuffer(GL_ARRAY_BUFFER, gVbo_position);
-
 	glBufferData(GL_ARRAY_BUFFER, sizeof(triangleVertices), triangleVertices, GL_STATIC_DRAW);
 
 	glVertexAttribPointer(VDG_ATTRIBUTE_VERTEX, 3, GL_FLOAT, GL_FALSE, 0, NULL);
@@ -439,14 +437,13 @@ void initialize(void)
 	glBindVertexArray(0);
 
 
-
 	const GLfloat colorVertices[] =
 	{ 1.0f,0.0f,0.0f, //0
 		0.0f,1.0f,0.0f,
 		0.0f,0.0f,1.0f
 	};
 
-	glGenVertexArrays(1, &gVao);
+	glGenVertexArrays(1, &gVbo_color);
 	glBindVertexArray(gVao);
 
 	glGenBuffers(1, &gVbo_color);
@@ -459,6 +456,7 @@ void initialize(void)
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
+
 
 	//*************************************************
 	printOpenGlExtentions();
@@ -545,9 +543,8 @@ void uninitialize(void)
 	if (gVbo_color)
 	{
 		glDeleteBuffers(1, &gVbo_color);
-		gVbo_position = 0;
+		gVbo_color = 0;
 	}
-
 
 	glDetachShader(gShaderProgramObject, gVertexShaderObject);
 	glDetachShader(gShaderProgramObject, gFragmentShaderObject);
