@@ -23,8 +23,8 @@ enum
 {
 	VDG_ATTRIBUTE_VERTEX = 0,
 	VDG_ATTRIBUTE_COLOR = 1,
-	VDG_ATTRIBUTE_NORMAL= 2,
-	VDG_ATTRIBUTE_TEXTURE=3,
+	VDG_ATTRIBUTE_NORMAL = 2,
+	VDG_ATTRIBUTE_TEXTURE = 3,
 };
 
 
@@ -42,6 +42,7 @@ bool gbEscapeKeyIsPressed = false;
 bool gbFullscreen = false;
 
 int printOpenGlExtentions(void);
+void update(void);
 
 FILE *gpFile = NULL;
 
@@ -61,6 +62,7 @@ GLuint gMVPUniform;
 //
 mat4 gPerspectiveProjectionMatrix;
 
+GLfloat angleTriangle = 0.0f, angleQuads = 0.0f;
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, int iCmdShow)
 {
@@ -106,7 +108,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
 	// create window
 	hwnd = CreateWindowEx(WS_EX_APPWINDOW,
 		szClassName,
-		TEXT("PP:Perspective Triangle Two Shapes (using two vao)"),
+		TEXT("PP:Two Rotating Shapes"),
 		WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE,
 		100,
 		100,
@@ -146,6 +148,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
 				if (gbEscapeKeyIsPressed == true)
 					bDone = true;
 			}
+			update();
 			display();
 		}
 	}
@@ -308,11 +311,14 @@ void initialize(void)
 	const GLchar *vertexShaderSourceCode =
 		"#version 430 core"\
 		"\n"\
+		"in vec4 vColor;"\
 		"in vec4 vPosition;"\
+		"out vec4 out_color;"\
 		"uniform mat4 u_mvp_matrix;"\
 		"void main(void)" \
 		"{" \
 		"gl_Position=u_mvp_matrix * vPosition;"
+		"out_color=vColor;"
 		"}";
 
 	glShaderSource(gVertexShaderObject, 1, (const GLchar **)&vertexShaderSourceCode, NULL);
@@ -348,10 +354,11 @@ void initialize(void)
 	const GLchar *fragmentShaderSourceCode =
 		"#version 430 core"\
 		"\n"\
+		"in vec4 out_color;"
 		"out vec4 FragColor;"
 		"void main(void)" \
 		"{" \
-		"FragColor=vec4(1.0,1.0,1.0,1.0);"\
+		"FragColor=out_color;"//vec4(1.0,1.0,1.0,1.0);"\ 
 		"}";
 
 	glShaderSource(gFragmentShaderObject, 1, (const GLchar **)&fragmentShaderSourceCode, NULL);
@@ -435,15 +442,35 @@ void initialize(void)
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 
+
+
+	const GLfloat colorVertices[] =
+	{
+		1.0f,0.0f,0.0f,
+		0.0f,1.0f,0.0f,
+		0.0f,0.0f,1.0f
+	};
+
+	glBindVertexArray(gVao_triangle);
+	glGenBuffers(1, &gVbo);
+	glBindBuffer(GL_ARRAY_BUFFER, gVbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(colorVertices), colorVertices, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(VDG_ATTRIBUTE_COLOR, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+	glEnableVertexAttribArray(VDG_ATTRIBUTE_COLOR);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+
 	const GLfloat quadsVertices[] =
-	{	1.0f,1.0f,0.0f, //0
+	{ 1.0f,1.0f,0.0f, //0
 		-1.0f,1.0f,0.0f,
 		-1.0f,-1.0f,0.0f,
 		1.0f,-1.0f,0.0f,
 	};
 
 	glGenVertexArrays(1, &gVao_quads);
-		glBindVertexArray(gVao_quads);
+	glBindVertexArray(gVao_quads);
 
 	glGenBuffers(1, &gVbo_quads);
 	glBindBuffer(GL_ARRAY_BUFFER, gVbo_quads);
@@ -452,6 +479,8 @@ void initialize(void)
 	glVertexAttribPointer(VDG_ATTRIBUTE_VERTEX, 3, GL_FLOAT, GL_FALSE, 0, NULL);
 
 	glEnableVertexAttribArray(VDG_ATTRIBUTE_VERTEX);
+
+	glVertexAttrib3f(VDG_ATTRIBUTE_COLOR, 0.0f, 0.0f, 1.0f);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
@@ -465,7 +494,7 @@ void initialize(void)
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
 	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
-	glEnable(GL_CULL_FACE);
+	//glEnable(GL_CULL_FACE);
 
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
@@ -496,7 +525,14 @@ void display(void)
 	//******************************* Triangle block **********************************
 	mat4 	modelViewMatrix = mat4::identity();  //initialize model view matrix
 	modelViewMatrix = translate(-1.5f, 0.0f, -6.0f); //translate function return matrix with translate parameter
+	
+	mat4  rotationMatrix = mat4::identity();
+	rotationMatrix = rotate(angleTriangle, 0.0f, 1.0f, 0.0f);
+
+	modelViewMatrix = modelViewMatrix*rotationMatrix;
+
 	mat4  modelViewProjectionMatrix = mat4::identity();
+	
 	modelViewProjectionMatrix = gPerspectiveProjectionMatrix*modelViewMatrix;
 
 	glUniformMatrix4fv(gMVPUniform, 1, GL_FALSE, modelViewProjectionMatrix);
@@ -504,13 +540,19 @@ void display(void)
 	glBindVertexArray(gVao_triangle);
 
 	glDrawArrays(GL_TRIANGLES, 0, 3);
-	
+
 	glBindVertexArray(0);
 
 	//******************************* Quads block **********************************
 
 	modelViewMatrix = mat4::identity();  //initialize model view matrix
 	modelViewMatrix = translate(1.5f, 0.0f, -6.0f); //translate function return matrix with translate parameter
+	
+	rotationMatrix = mat4::identity();
+	rotationMatrix = rotate(angleQuads, 1.0f, 0.0f, 0.0f);
+
+	modelViewMatrix = modelViewMatrix*rotationMatrix;
+	
 	modelViewProjectionMatrix = mat4::identity();
 	modelViewProjectionMatrix = gPerspectiveProjectionMatrix*modelViewMatrix;
 
@@ -521,7 +563,7 @@ void display(void)
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
 
-//*****************************************************************************
+	//*****************************************************************************
 	glBindVertexArray(0);
 
 	glUseProgram(0);
@@ -606,4 +648,16 @@ int printOpenGlExtentions(void)
 		fprintf(gpFile, "Shader Program Link Log : %s\n", glGetStringi(GL_EXTENSIONS, i));
 	}
 	return 0;
+}
+
+void update(void)
+{
+	//code
+	angleTriangle = angleTriangle + 0.1f;
+	if (angleTriangle >= 360.0f)
+		angleTriangle = 0.0f;
+
+	angleQuads = angleQuads + 0.1f;
+	if (angleQuads >= 360.0f)
+		angleQuads = 0.0f;
 }
