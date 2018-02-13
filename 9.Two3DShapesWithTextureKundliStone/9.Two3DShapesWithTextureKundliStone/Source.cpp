@@ -8,7 +8,7 @@
 #include <gl/GLU.h>
 
 #include "vmath.h"
-
+#include "MSOGLWindow.h"
 #define WIN_WIDTH 800
 #define WIN_HEIGHT 600
 
@@ -55,10 +55,11 @@ void uninitialize(void);
 GLuint gVao_triangle;
 GLuint gVao_quads;
 
-GLuint gVbo;
-GLuint gVbo_quads;
+GLuint gVbo_triangle;
+GLuint gVbo_triangle_texture;
 
-GLuint gVboColorQuods;
+GLuint gVbo_quads;
+GLuint gVbo_quads_texture;
 
 GLuint gMVPUniform;
 //
@@ -66,6 +67,11 @@ mat4 gPerspectiveProjectionMatrix;
 
 GLfloat angleTriangle = 0.0f, angleQuads = 0.0f;
 
+GLuint gTextureSamplerUniform;
+GLuint gTextureKundli;
+GLuint gTextureStone;
+
+int LoadGLTexture(GLuint*, TCHAR[]);
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, int iCmdShow)
 {
 	void initialize(void);
@@ -110,7 +116,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
 	// create window
 	hwnd = CreateWindowEx(WS_EX_APPWINDOW,
 		szClassName,
-		TEXT("PP:Two Rotating Shapes"),
+		TEXT("PP:Two Rotating Textured Shapes"),
 		WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE,
 		100,
 		100,
@@ -249,7 +255,6 @@ void initialize(void)
 {
 	void resize(int, int);
 
-
 	PIXELFORMATDESCRIPTOR pfd;
 	int iPixelFormatIndex;
 
@@ -313,14 +318,14 @@ void initialize(void)
 	const GLchar *vertexShaderSourceCode =
 		"#version 430 core"\
 		"\n"\
-		"in vec4 vColor;"\
+		"in vec2 vTexture0_coord;"\
 		"in vec4 vPosition;"\
-		"out vec4 out_color;"\
+		"out vec2 out_Texture0_coord;"\
 		"uniform mat4 u_mvp_matrix;"\
 		"void main(void)" \
 		"{" \
 		"gl_Position=u_mvp_matrix * vPosition;"
-		"out_color=vColor;"
+		"out_Texture0_coord=vTexture0_coord;"
 		"}";
 
 	glShaderSource(gVertexShaderObject, 1, (const GLchar **)&vertexShaderSourceCode, NULL);
@@ -356,11 +361,12 @@ void initialize(void)
 	const GLchar *fragmentShaderSourceCode =
 		"#version 430 core"\
 		"\n"\
-		"in vec4 out_color;"
+		"in vec2 out_Texture0_coord;"
 		"out vec4 FragColor;"
+		"uniform sampler2D u_texture0_sampler;"
 		"void main(void)" \
 		"{" \
-		"FragColor=out_color;"//vec4(1.0,1.0,1.0,1.0);"\ 
+		"FragColor=texture(u_texture0_sampler,out_Texture0_coord);" \
 		"}";
 
 	glShaderSource(gFragmentShaderObject, 1, (const GLchar **)&fragmentShaderSourceCode, NULL);
@@ -398,8 +404,8 @@ void initialize(void)
 	// attach fragment shader to shader program
 	glAttachShader(gShaderProgramObject, gFragmentShaderObject);
 
-	//glBindAttribLocation(gShaderProgramObject, VDG_ATTRIBUTE_VERTEX, "vPosition");
-	//glBindAttribLocation(gShaderProgramObject, VDG_ATTRIBUTE_VERTEX, "vColor");
+	glBindAttribLocation(gShaderProgramObject, VDG_ATTRIBUTE_VERTEX, "vPosition");
+	glBindAttribLocation(gShaderProgramObject, VDG_ATTRIBUTE_TEXTURE, "vTexture0_coord");
 
 	//**************************************** Link Shader program **********************************************
 	glLinkProgram(gShaderProgramObject);
@@ -426,9 +432,10 @@ void initialize(void)
 	//**************************************** END Link Shader program **********************************************
 
 	gMVPUniform = glGetUniformLocation(gShaderProgramObject, "u_mvp_matrix");
-//************************************ Pyramid ********************************************************
+	gTextureSamplerUniform = glGetUniformLocation(gShaderProgramObject,"u_texture0_sampler");
+	//************************************ Pyramid ********************************************************
 	const GLfloat triangleVertices[] =
-	{ 
+	{
 		0.0f, 1.0f, 0.0f,
 		-1.0f, -1.0f, 1.0f,
 		1.0f, -1.0f, 1.0f,
@@ -443,11 +450,12 @@ void initialize(void)
 		-1.0f, -1.0f, 1.0f
 	};
 
+
 	glGenVertexArrays(1, &gVao_triangle);
 	glBindVertexArray(gVao_triangle);
 
-	glGenBuffers(1, &gVbo);
-	glBindBuffer(GL_ARRAY_BUFFER, gVbo);
+	glGenBuffers(1, &gVbo_triangle);
+	glBindBuffer(GL_ARRAY_BUFFER, gVbo_triangle);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(triangleVertices), triangleVertices, GL_STATIC_DRAW);
 
 	glVertexAttribPointer(VDG_ATTRIBUTE_VERTEX, 3, GL_FLOAT, GL_FALSE, 0, NULL);
@@ -455,43 +463,43 @@ void initialize(void)
 	glEnableVertexAttribArray(VDG_ATTRIBUTE_VERTEX);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindVertexArray(0);
 
-//******************************** Pyramid Color 
-	const GLfloat colorVertices[] =
+
+	//******************************** Pyramid Color 
+
+	const GLfloat triangleTextureQuads[] =
 	{
-		1.0f,0.0f,0.0f,
-		0.0f,1.0f,0.0f,
-		0.0f,0.0f,1.0f,
+		0.5f,1.0f,
+		0.0f,0.0f,
+		1.0f,0.0f,
 
-		1.0f,0.0f,0.0f,
-		0.0f,1.0f,0.0f,
-		0.0f,0.0f,1.0f,
+		0.5f,1.0f,
+		1.0f,0.0f,
+		0.0f,0.0f,
 
-		1.0f,0.0f,0.0f,
-		0.0f,1.0f,0.0f,
-		0.0f,0.0f,1.0f,
+		0.5f,1.0f,
+		1.0f,0.0f,
+		0.0f,0.0f,
 
-		1.0f,0.0f,0.0f,
-		0.0f,1.0f,0.0f,
-		0.0f,0.0f,1.0f
+		0.5f,1.0f,
+		0.0f,0.0f,
+		1.0f,0.0f
 	};
 
-	glBindVertexArray(gVao_triangle);
-	glGenBuffers(1, &gVbo);
-	glBindBuffer(GL_ARRAY_BUFFER, gVbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(colorVertices), colorVertices, GL_STATIC_DRAW);
+	glGenBuffers(1, &gVbo_triangle_texture);
+	glBindBuffer(GL_ARRAY_BUFFER, gVbo_triangle_texture);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(triangleTextureQuads), triangleTextureQuads, GL_STATIC_DRAW);
 
-	glVertexAttribPointer(VDG_ATTRIBUTE_COLOR, 3, GL_FLOAT, GL_FALSE, 0, NULL);
-	glEnableVertexAttribArray(VDG_ATTRIBUTE_COLOR);
+	glVertexAttribPointer(VDG_ATTRIBUTE_TEXTURE, 2, GL_FLOAT, GL_FALSE, 0, NULL);
+	glEnableVertexAttribArray(VDG_ATTRIBUTE_TEXTURE);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 
-//************************************ Quods ********************************************************
+	//************************************ Quods ********************************************************
 
 	const GLfloat quadsVertices[] =
-	{ 
+	{
 		1.0f, 1.0f, -1.0f,  //right-top corner of top face
 		-1.0f, 1.0f, -1.0f, //left-top corner of top face
 		-1.0f, 1.0f, 1.0f, //left-bottom corner of top face
@@ -533,58 +541,58 @@ void initialize(void)
 	glVertexAttribPointer(VDG_ATTRIBUTE_VERTEX, 3, GL_FLOAT, GL_FALSE, 0, NULL);
 
 	glEnableVertexAttribArray(VDG_ATTRIBUTE_VERTEX);
-	
+
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 
-//************************************ Quods color
-	GLfloat colorQuadsVertices[] =
+	//************************************ Quods color
+	GLfloat textureQuadsVertices[] =
 	{
-		1.0f, 0.0f, 0.0f, //RED
-		1.0f, 0.0f, 0.0f, //RED
-		1.0f, 0.0f, 0.0f, //RED
-		1.0f, 0.0f, 0.0f, //RED
+		0.0f, 0.0f,
+		1.0f, 0.0f,
+		1.0f, 1.0f,
+		0.0f, 1.0f,
 
-		1.0f, 0.0f, 1.0f, //MAGENTA
-		1.0f, 0.0f, 1.0f, //MAGENTA
-		1.0f, 0.0f, 1.0f, //MAGENTA
-		1.0f, 0.0f, 1.0f, //MAGENTA
+		0.0f, 0.0f,
+		1.0f, 0.0f,
+		1.0f, 1.0f,
+		0.0f, 1.0f,
 
-		0.0f, 1.0f, 1.0f, //CYAN
-		0.0f, 1.0f, 1.0f, //CYAN
-		0.0f, 1.0f, 1.0f, //CYAN
-		0.0f, 1.0f, 1.0f, //CYAN
+		0.0f, 0.0f,
+		1.0f, 0.0f,
+		1.0f, 1.0f,
+		0.0f, 1.0f,
 
-		0.0f, 0.0f, 1.0f, //BLUE
-		0.0f, 0.0f, 1.0f, //BLUE
-		0.0f, 0.0f, 1.0f, //BLUE
-		0.0f, 0.0f, 1.0f, //BLUE
+		0.0f, 0.0f,
+		1.0f, 0.0f,
+		1.0f, 1.0f,
+		0.0f, 1.0f,
 
-		0.0f, 1.0f, 0.0f, //GREEN
-		0.0f, 1.0f, 0.0f, //GREEN
-		0.0f, 1.0f, 0.0f, //GREEN
-		0.0f, 1.0f, 0.0f, //GREEN
+		0.0f, 0.0f,
+		1.0f, 0.0f,
+		1.0f, 1.0f,
+		0.0f, 1.0f,
 
-		1.0f, 1.0f, 0.0f, //YELLOW
-		1.0f, 1.0f, 0.0f, //YELLOW
-		1.0f, 1.0f, 0.0f, //YELLOW
-		1.0f, 1.0f, 0.0f, //YELLOW
+		0.0f, 0.0f,
+		1.0f, 0.0f,
+		1.0f, 1.0f,
+		0.0f, 1.0f,
 	};
 
 	glBindVertexArray(gVao_quads);
-	glGenBuffers(1, &gVboColorQuods);
-	glBindBuffer(GL_ARRAY_BUFFER, gVboColorQuods);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(colorQuadsVertices), colorQuadsVertices, GL_STATIC_DRAW);
+	glGenBuffers(1, &gVbo_quads_texture);
+	glBindBuffer(GL_ARRAY_BUFFER, gVbo_quads_texture);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(textureQuadsVertices), textureQuadsVertices, GL_STATIC_DRAW);
 
-	
-//	glVertexAttrib3f(VDG_ATTRIBUTE_COLOR, 1.0f, 0.0f, 0.0f);
-	glVertexAttribPointer(VDG_ATTRIBUTE_COLOR, 3, GL_FLOAT, GL_FALSE, 0, NULL);
-	glEnableVertexAttribArray(VDG_ATTRIBUTE_COLOR);
+
+	//	glVertexAttrib3f(VDG_ATTRIBUTE_COLOR, 1.0f, 0.0f, 0.0f);
+	glVertexAttribPointer(VDG_ATTRIBUTE_TEXTURE, 2, GL_FLOAT, GL_FALSE, 0, NULL);
+	glEnableVertexAttribArray(VDG_ATTRIBUTE_TEXTURE);
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 
-//***********************************************************************************
+	//***********************************************************************************
 	printOpenGlExtentions();
 
 	glShadeModel(GL_SMOOTH);
@@ -592,8 +600,11 @@ void initialize(void)
 	glClearDepth(1.0f);
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
-	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
+	//glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 	//glEnable(GL_CULL_FACE);
+
+	LoadGLTexture(&gTextureStone, MAKEINTRESOURCE(IDBITMAP_STONE));
+	LoadGLTexture(&gTextureKundli, MAKEINTRESOURCE(IDBITMAP_KUNDALI));
 
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
@@ -638,9 +649,14 @@ void display(void)
 
 	glBindVertexArray(gVao_triangle);
 
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D,gTextureStone);
+	glUniform1i(gTextureSamplerUniform, 0);
+
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 12);
 
 	glBindVertexArray(0);
+	glBindTexture(GL_TEXTURE_2D,0);
 
 	//******************************* Quads block **********************************
 
@@ -659,23 +675,27 @@ void display(void)
 
 	glBindVertexArray(gVao_quads);
 
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, gTextureKundli);
+	glUniform1i(gTextureSamplerUniform, 0);
+
+	
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 	glDrawArrays(GL_TRIANGLE_FAN, 4, 4);
 	glDrawArrays(GL_TRIANGLE_FAN, 8, 4);
-	
+
 	glDrawArrays(GL_TRIANGLE_FAN, 12, 4);
 	glDrawArrays(GL_TRIANGLE_FAN, 16, 4);
 	glDrawArrays(GL_TRIANGLE_FAN, 20, 4);
 
-
-
 	//*****************************************************************************
+	
+	glBindTexture(GL_TEXTURE_2D, 0);
 	glBindVertexArray(0);
 
 	glUseProgram(0);
 
 	SwapBuffers(ghdc);
-
 }
 
 
@@ -704,10 +724,28 @@ void uninitialize(void)
 		gVao_quads = 0;
 	}
 
-	if (gVbo)
+	if (gVbo_triangle)
 	{
-		glDeleteBuffers(1, &gVbo);
-		gVbo = 0;
+		glDeleteBuffers(1, &gVbo_triangle);
+		gVbo_triangle = 0;
+	}
+
+	if (gVbo_triangle_texture)
+	{
+		glDeleteBuffers(1, &gVbo_triangle_texture);
+		gVbo_triangle_texture = 0;
+	}
+
+	if (gVbo_quads)
+	{
+		glDeleteBuffers(1, &gVbo_quads);
+		gVbo_quads = 0;
+	}
+
+	if (gVbo_quads_texture)
+	{
+		glDeleteBuffers(1, &gVbo_quads_texture);
+		gVbo_quads_texture = 0;
 	}
 
 	glDetachShader(gShaderProgramObject, gVertexShaderObject);
@@ -766,4 +804,42 @@ void update(void)
 	angleQuads = angleQuads + 0.1f;
 	if (angleQuads >= 360.0f)
 		angleQuads = 0.0f;
+}
+
+int LoadGLTexture(GLuint *texture, TCHAR imageResourceId[])
+{
+	//variable declarations
+	HBITMAP hBitmap;
+	BITMAP bmp;
+	int iStatus = FALSE;
+
+	//code
+	glGenTextures(1, texture); //1 image
+	hBitmap = (HBITMAP)LoadImage(GetModuleHandle(NULL), imageResourceId, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
+	if (hBitmap) //if bitmap exists ( means hBitmap is not null )
+	{
+		iStatus = TRUE;
+		GetObject(hBitmap, sizeof(bmp), &bmp);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 4); //pixel storage mode (word alignment/4 bytes)
+		glBindTexture(GL_TEXTURE_2D, *texture); //bind texture
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		//generate mipmapped texture (3 bytes, width, height & data from bmp)
+		//gluBuild2DMipmaps(GL_TEXTURE_2D, 3, bmp.bmWidth, bmp.bmHeight, GL_BGR_EXT, GL_UNSIGNED_BYTE, bmp.bmBits);
+
+		glTexImage2D(GL_TEXTURE_2D,
+			0,
+			GL_RGB,
+			bmp.bmWidth,
+			bmp.bmHeight,
+			0,
+			GL_BGR,
+			GL_UNSIGNED_BYTE,
+			bmp.bmBits);
+
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		DeleteObject(hBitmap); //delete unwanted bitmap handle
+	}
+	return(iStatus);
 }
