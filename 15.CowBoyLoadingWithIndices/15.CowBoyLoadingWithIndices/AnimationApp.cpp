@@ -11,7 +11,7 @@
 
 #include "vmath.h"
 #include "MeshData.h"
-
+#include "MSOGLWindow.h"
 
 
 #define WIN_WIDTH 800
@@ -58,12 +58,25 @@ void uninitialize(void);
 
 GLuint gVao;
 GLuint gVbo_position;
-GLuint gVbo_color;
+GLuint gVbo_texture;
+GLuint gVboNormal;
 GLuint gMVPUniform;
 
 GLuint gVbo_index;
 
-//
+GLuint gTextureSamplerUniform;
+
+GLuint gModelViewMatrixUniform, gProjectionMatrixUniform;
+GLuint gLdUniform, gKdUniform, gLightPositionUniform;
+
+GLuint gLKeyPressedUniform;
+
+GLuint gTexture;
+
+
+int LoadGLTexture(GLuint*, TCHAR[]);
+
+
 mat4 gPerspectiveProjectionMatrix;
 
 
@@ -314,14 +327,22 @@ void initialize(void)
 	const GLchar *vertexShaderSourceCode =
 		"#version 430 core"\
 		"\n"\
-		"in vec4 vPosition;"\
-		"in vec4 vColor;"\
+		"in vec3 vPosition;"\
+		"in vec2 vTexture0_coord;"\
+
 		"uniform mat4 u_mvp_matrix;"\
-		"out vec4 outColor;"\
+
+		"out vec2 out_Texture0_coord;"\
+		"out float pass_height;"\
+
 		"void main(void)" \
 		"{" \
-		"gl_Position=u_mvp_matrix * vPosition;"
-		"outColor=vColor;"
+
+
+		"gl_Position=u_mvp_matrix * vec4(vPosition , 1.0);"
+		//"gl_Position = u_projection_matrix * u_model_view_matrix * vPosition;" \"
+		"out_Texture0_coord=vTexture0_coord;"
+		"pass_height = vPosition.y;"\
 		"}";
 
 	glShaderSource(gVertexShaderObject, 1, (const GLchar **)&vertexShaderSourceCode, NULL);
@@ -354,16 +375,37 @@ void initialize(void)
 	//**************************************** Fragment shader **********************************************
 	gFragmentShaderObject = glCreateShader(GL_FRAGMENT_SHADER);
 
+	//const GLchar *fragmentShaderSourceCode =
+	//	"#version 430 core"\
+	//	"\n"\
+
+	//	"in vec2 out_Texture0_coord;"
+	//	"out vec4 FragColor;"
+	//	"uniform sampler2D u_texture0_sampler;"
+	//	"void main(void)" \
+	//	"{" \
+	//	//"FragColor=outColor;"\"
+	//	"FragColor=texture(u_texture0_sampler,out_Texture0_coord);" \
+	//	"}";
+
 	const GLchar *fragmentShaderSourceCode =
-		"#version 430 core"\
-		"\n"\
-		"in vec4 outColor;"
-		"out vec4 FragColor;"
-		"void main(void)" \
-		"{" \
-		//"FragColor=outColor;"\"
-		"FragColor=vec4(1.0,1.0,1.0,1.0);"\
+		"const vec4 colour1 = vec4(0.0, 0.0, 0.0, 1.0);"\
+		"in float pass_height;"\
+		"in vec2 out_Texture0_coord;"
+		"uniform sampler2D u_texture0_sampler;"
+		"out vec4 FragColor;"\
+		/*"float smoothlyStep(float edge0, float edge1, float x) {"\
+		"float t = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);"\
+		"return t * t * (3.0 - 2.0 * t);"\
+		"};"\
+*/
+		"void main(void) {"\
+		//"float fadeFactor = 1.0 - smoothlyStep(-50.0, 70.0, pass_height);"\
+		//"FragColor = mix( colour1,texture(u_texture0_sampler,out_Texture0_coord), fadeFactor);"\"
+		"FragColor = texture(u_texture0_sampler,out_Texture0_coord);"\
 		"}";
+
+
 
 	glShaderSource(gFragmentShaderObject, 1, (const GLchar **)&fragmentShaderSourceCode, NULL);
 
@@ -400,6 +442,12 @@ void initialize(void)
 	// attach fragment shader to shader program
 	glAttachShader(gShaderProgramObject, gFragmentShaderObject);
 
+
+	glBindAttribLocation(gShaderProgramObject, VDG_ATTRIBUTE_VERTEX, "vPosition");
+	glBindAttribLocation(gShaderProgramObject, VDG_ATTRIBUTE_TEXTURE0, "vTexture0_coord");
+	glBindAttribLocation(gShaderProgramObject, VDG_ATTRIBUTE_NORMAL, "vNormal");
+
+
 	//**************************************** Link Shader program **********************************************
 	glLinkProgram(gShaderProgramObject);
 	GLint iShaderProgramLinkStatus = 0;
@@ -425,12 +473,26 @@ void initialize(void)
 	//**************************************** END Link Shader program **********************************************
 
 	gMVPUniform = glGetUniformLocation(gShaderProgramObject, "u_mvp_matrix");
+	gTextureSamplerUniform = glGetUniformLocation(gShaderProgramObject, "u_texture0_sampler");
+
+
+	// get uniform locations
+	gModelViewMatrixUniform = glGetUniformLocation(gShaderProgramObject, "u_model_view_matrix");
+	gProjectionMatrixUniform = glGetUniformLocation(gShaderProgramObject, "u_projection_matrix");
+
+	gLKeyPressedUniform = glGetUniformLocation(gShaderProgramObject, "u_LKeyPressed");
+
+	gLdUniform = glGetUniformLocation(gShaderProgramObject, "u_Ld");
+	gKdUniform = glGetUniformLocation(gShaderProgramObject, "u_Kd");
+	gLightPositionUniform = glGetUniformLocation(gShaderProgramObject, "u_light_position");;
+
+	//************************************************************************************************************************
 
 	MeshData md;
 	
 	//*************************************** Triangle Vertices *************************
-	GLfloat triangleVertices[12238];
-	for (int i = 0; i < 12238;i++)
+	GLfloat triangleVertices[12780];
+	for (int i = 0; i < 12780;i++)
 	triangleVertices[i]=(GLfloat) md.getVertices()[i];
 	
 	
@@ -450,8 +512,8 @@ void initialize(void)
 
 	//*************************************** Triangle Indices *************************
 
-	GLushort indices[3670];
-	for (int i = 0; i < 3670; i++)
+	GLushort indices[4260];
+	for (int i = 0; i < 4260; i++)
 		indices[i] = (GLushort)md.getIndices()[i];
 	glGenBuffers(1, &gVbo_index);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gVbo_index);
@@ -459,24 +521,36 @@ void initialize(void)
 
 	//*************************************** Triangle Indices *************************
 
+	//************************************ Quods color
+	GLfloat textureVertices[8520];
 
-	const GLfloat colorVertices[] =
-	{
-		1.0f,0.0f,0.0f,
-		0.0f,1.0f,0.0f,
-		0.0f,0.0f,1.0f
-	};
+	for (int i = 0; i < 8520; i++)
+		textureVertices[i] = (GLfloat)md.getTextureCoords()[i];
 
-	glGenVertexArrays(1, &gVbo_color);
 	glBindVertexArray(gVao);
+	glGenBuffers(1, &gVbo_texture);
+	glBindBuffer(GL_ARRAY_BUFFER, gVbo_texture);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(textureVertices), textureVertices, GL_STATIC_DRAW);
 
-	glGenBuffers(1, &gVbo_color);
-	glBindBuffer(GL_ARRAY_BUFFER, gVbo_color);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(colorVertices), colorVertices, GL_STATIC_DRAW);
 
-	glVertexAttribPointer(VDG_ATTRIBUTE_COLOR, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+	//	glVertexAttrib3f(VDG_ATTRIBUTE_COLOR, 1.0f, 0.0f, 0.0f);
+	glVertexAttribPointer(VDG_ATTRIBUTE_TEXTURE0, 2, GL_FLOAT, GL_FALSE, 0, NULL);
+	glEnableVertexAttribArray(VDG_ATTRIBUTE_TEXTURE0);
 
-	glEnableVertexAttribArray(VDG_ATTRIBUTE_COLOR);
+
+	GLfloat normals[12780];
+	for (int i = 0; i < 12780; i++)
+		normals[i] = (GLfloat)md.getNormals()[i];
+
+
+	glGenBuffers(1, &gVboNormal);
+	glBindBuffer(GL_ARRAY_BUFFER, gVboNormal);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(gVboNormal), normals, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(VDG_ATTRIBUTE_NORMAL, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+
+	glEnableVertexAttribArray(VDG_ATTRIBUTE_NORMAL);
+
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
@@ -493,6 +567,8 @@ void initialize(void)
 	glDepthFunc(GL_LEQUAL);
 	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 	glEnable(GL_CULL_FACE);
+
+	LoadGLTexture(&gTexture, MAKEINTRESOURCE(IDBITMAP_SMILY));
 
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
@@ -530,10 +606,14 @@ void display(void)
 	glBindVertexArray(gVao);
 
 
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, gTexture);
+	glUniform1i(gTextureSamplerUniform, 0);
+
 	//glDrawArrays(GL_TRIANGLES, 0, 3);
 	//glDrawArrays(GL_TRIANGLE_FAN, 0, 3670);
 
-	glDrawElements(GL_TRIANGLES, 3670, GL_UNSIGNED_SHORT, 0);
+	glDrawElements(GL_TRIANGLES, 4260, GL_UNSIGNED_SHORT, 0);
 	//glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, 0);
 
 	glBindVertexArray(0);
@@ -570,10 +650,10 @@ void uninitialize(void)
 		gVbo_position = 0;
 	}
 
-	if (gVbo_color)
+	if (gVbo_texture)
 	{
-		glDeleteBuffers(1, &gVbo_color);
-		gVbo_color = 0;
+		glDeleteBuffers(1, &gVbo_texture);
+		gVbo_texture = 0;
 	}
 
 	glDetachShader(gShaderProgramObject, gVertexShaderObject);
@@ -620,4 +700,40 @@ int printOpenGlExtentions(void)
 		fprintf(gpFile, "Shader Program Link Log : %s\n", glGetStringi(GL_EXTENSIONS, i));
 	}
 	return 0;
+}
+
+int LoadGLTexture(GLuint *texture, TCHAR imageResourceId[])
+{
+	//variable declarations
+	HBITMAP hBitmap;
+	BITMAP bmp;
+	int iStatus = FALSE;
+
+	//code
+	glGenTextures(1, texture); //1 image
+	hBitmap = (HBITMAP)LoadImage(GetModuleHandle(NULL), imageResourceId, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
+	if (hBitmap) //if bitmap exists ( means hBitmap is not null )
+	{
+		iStatus = TRUE;
+		GetObject(hBitmap, sizeof(bmp), &bmp);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 4); //pixel storage mode (word alignment/4 bytes)
+		glBindTexture(GL_TEXTURE_2D, *texture); //bind texture
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+		glTexImage2D(GL_TEXTURE_2D,
+			0,
+			GL_RGB,
+			bmp.bmWidth,
+			bmp.bmHeight,
+			0,
+			GL_BGR,
+			GL_UNSIGNED_BYTE,
+			bmp.bmBits);
+
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		DeleteObject(hBitmap); //delete unwanted bitmap handle
+	}
+	return(iStatus);
 }

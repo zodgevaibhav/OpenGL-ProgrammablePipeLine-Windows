@@ -22,11 +22,11 @@ int *MeshData::getJointIds()
 		return vertices;
 	}
 
-	float* MeshData::getTextureCoords() {
+	float *MeshData::getTextureCoords() {
 		return textureCoords;
 	}
 
-	float* MeshData::getNormals() {
+	float *MeshData::getNormals() {
 		return normals;
 	}
 
