@@ -13,6 +13,7 @@
 #include "MeshData.h"
 #include "MSOGLWindow.h"
 
+#include "MeshData.h"
 
 #define WIN_WIDTH 800
 #define WIN_HEIGHT 600
@@ -82,7 +83,7 @@ mat4 gPerspectiveProjectionMatrix;
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, int iCmdShow)
 {
-	
+
 	void initialize(void);
 	void update(void);
 	void display(void);
@@ -337,10 +338,7 @@ void initialize(void)
 
 		"void main(void)" \
 		"{" \
-
-
 		"gl_Position=u_mvp_matrix * vec4(vPosition , 1.0);"
-		//"gl_Position = u_projection_matrix * u_model_view_matrix * vPosition;" \"
 		"out_Texture0_coord=vTexture0_coord;"
 		"pass_height = vPosition.y;"\
 		"}";
@@ -375,35 +373,34 @@ void initialize(void)
 	//**************************************** Fragment shader **********************************************
 	gFragmentShaderObject = glCreateShader(GL_FRAGMENT_SHADER);
 
-	//const GLchar *fragmentShaderSourceCode =
-	//	"#version 430 core"\
-	//	"\n"\
-
-	//	"in vec2 out_Texture0_coord;"
-	//	"out vec4 FragColor;"
-	//	"uniform sampler2D u_texture0_sampler;"
-	//	"void main(void)" \
-	//	"{" \
-	//	//"FragColor=outColor;"\"
-	//	"FragColor=texture(u_texture0_sampler,out_Texture0_coord);" \
-	//	"}";
-
 	const GLchar *fragmentShaderSourceCode =
-		"const vec4 colour1 = vec4(0.0, 0.0, 0.0, 1.0);"\
-		"in float pass_height;"\
-		"in vec2 out_Texture0_coord;"
-		"uniform sampler2D u_texture0_sampler;"
-		"out vec4 FragColor;"\
-		/*"float smoothlyStep(float edge0, float edge1, float x) {"\
-		"float t = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);"\
-		"return t * t * (3.0 - 2.0 * t);"\
-		"};"\
-*/
-		"void main(void) {"\
-		//"float fadeFactor = 1.0 - smoothlyStep(-50.0, 70.0, pass_height);"\
-		//"FragColor = mix( colour1,texture(u_texture0_sampler,out_Texture0_coord), fadeFactor);"\"
-		"FragColor = texture(u_texture0_sampler,out_Texture0_coord);"\
+		"#version 430 core"\
+			"\n"\
+
+	"in vec2 out_Texture0_coord;"
+	"out vec4 FragColor;"
+	"uniform sampler2D u_texture0_sampler;"
+	"void main(void)" \
+		"{" \
+	"FragColor=texture(u_texture0_sampler,out_Texture0_coord);" \
 		"}";
+
+	//const GLchar *fragmentShaderSourceCode =
+	//	"const vec4 colour1 = vec4(0.0, 0.0, 0.0, 1.0);"\
+	//	"in float pass_height;"\
+	//	"in vec2 out_Texture0_coord;"
+	//	"uniform sampler2D u_texture0_sampler;"
+	//	"out vec4 FragColor;"\
+	//	/*"float smoothlyStep(float edge0, float edge1, float x) {"\
+	//	"float t = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);"\
+	//	"return t * t * (3.0 - 2.0 * t);"\
+	//	"};"\
+	//	*/
+	//	"void main(void) {"\
+	//	//"float fadeFactor = 1.0 - smoothlyStep(-50.0, 70.0, pass_height);"\
+	//			//"FragColor = mix( colour1,texture(u_texture0_sampler,out_Texture0_coord), fadeFactor);"\"
+	//	"FragColor = texture(u_texture0_sampler,out_Texture0_coord);"\
+	//	"}";
 
 
 
@@ -488,20 +485,15 @@ void initialize(void)
 
 	//************************************************************************************************************************
 
-	MeshData md;
-	
+
 	//*************************************** Triangle Vertices *************************
-	GLfloat triangleVertices[12780];
-	for (int i = 0; i < 12780;i++)
-	triangleVertices[i]=(GLfloat) md.getVertices()[i];
-	
 	
 	glGenVertexArrays(1, &gVbo_position);
 	glBindVertexArray(gVao);
 
 	glGenBuffers(1, &gVbo_position);
 	glBindBuffer(GL_ARRAY_BUFFER, gVbo_position);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(triangleVertices), triangleVertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(modelPositions), modelPositions, GL_STATIC_DRAW);
 
 	glVertexAttribPointer(VDG_ATTRIBUTE_VERTEX, 3, GL_FLOAT, GL_FALSE, 0, NULL);
 
@@ -510,27 +502,23 @@ void initialize(void)
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 
-	//*************************************** Triangle Indices *************************
+	////*************************************** Triangle Indices *************************
 
-	GLushort indices[4260];
-	for (int i = 0; i < 4260; i++)
-		indices[i] = (GLushort)md.getIndices()[i];
-	glGenBuffers(1, &gVbo_index);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gVbo_index);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+	//GLushort indices[4260];
+	//for (int i = 0; i < 4260; i++)
+	//	indices[i] = (GLushort)md.getIndices()[i];
+	//glGenBuffers(1, &gVbo_index);
+	//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gVbo_index);
+	//glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
 	//*************************************** Triangle Indices *************************
 
 	//************************************ Quods color
-	GLfloat textureVertices[8520];
-
-	for (int i = 0; i < 8520; i++)
-		textureVertices[i] = (GLfloat)md.getTextureCoords()[i];
 
 	glBindVertexArray(gVao);
 	glGenBuffers(1, &gVbo_texture);
 	glBindBuffer(GL_ARRAY_BUFFER, gVbo_texture);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(textureVertices), textureVertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(modelTexels), modelTexels, GL_STATIC_DRAW);
 
 
 	//	glVertexAttrib3f(VDG_ATTRIBUTE_COLOR, 1.0f, 0.0f, 0.0f);
@@ -538,14 +526,10 @@ void initialize(void)
 	glEnableVertexAttribArray(VDG_ATTRIBUTE_TEXTURE0);
 
 
-	GLfloat normals[12780];
-	for (int i = 0; i < 12780; i++)
-		normals[i] = (GLfloat)md.getNormals()[i];
-
-
+	
 	glGenBuffers(1, &gVboNormal);
 	glBindBuffer(GL_ARRAY_BUFFER, gVboNormal);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(gVboNormal), normals, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(modelNormals), modelNormals, GL_STATIC_DRAW);
 
 	glVertexAttribPointer(VDG_ATTRIBUTE_NORMAL, 3, GL_FLOAT, GL_FALSE, 0, NULL);
 
@@ -555,8 +539,8 @@ void initialize(void)
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 
-																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																								//const GLushort indices[] = { 0,1,2 };
-	
+	//const GLushort indices[] = { 0,1,2 };
+
 	//*************************************************
 	printOpenGlExtentions();
 
@@ -609,12 +593,8 @@ void display(void)
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, gTexture);
 	glUniform1i(gTextureSamplerUniform, 0);
-
-	//glDrawArrays(GL_TRIANGLES, 0, 3);
-	//glDrawArrays(GL_TRIANGLE_FAN, 0, 3670);
-
-	glDrawElements(GL_TRIANGLES, 4260, GL_UNSIGNED_SHORT, 0);
-	//glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, 0);
+	
+	glDrawArrays(GL_TRIANGLES, 0,modelVertices );
 
 	glBindVertexArray(0);
 
