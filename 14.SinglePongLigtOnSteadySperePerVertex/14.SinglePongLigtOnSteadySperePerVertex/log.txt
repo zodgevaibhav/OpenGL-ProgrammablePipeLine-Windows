@@ -1,0 +1,2 @@
+***** File created successfull.
+Log File Is Successfully Closed.

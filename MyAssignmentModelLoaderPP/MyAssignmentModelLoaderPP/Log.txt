@@ -1,0 +1,3 @@
+Log file successfully created!
+GLSL version is:4.30 - Build 10.18.15.4248
+Closing log file

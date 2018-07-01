@@ -122,7 +122,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
 	// create window
 	hwnd = CreateWindowEx(WS_EX_APPWINDOW,
 		szClassName,
-		TEXT("PP:2D Texture Smily"),
+		TEXT("PP:Light on Rotating Cube"),
 		WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | WS_VISIBLE,
 		100,
 		100,
@@ -694,6 +694,7 @@ void display(void)
 	glBindVertexArray(gVao_cube);
 
 	// *** draw, either by glDrawTriangles() or glDrawArrays() or glDrawElements()
+	glViewport((GLsizei)WIN_WIDTH / 2, (GLsizei)WIN_HEIGHT / 2, (GLsizei)WIN_WIDTH, (GLsizei)WIN_HEIGHT);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 	glDrawArrays(GL_TRIANGLE_FAN, 4, 4);
 	glDrawArrays(GL_TRIANGLE_FAN, 8, 4);
@@ -715,7 +716,7 @@ void resize(int width, int height)
 	//code
 	if (height == 0)
 		height = 1;
-	glViewport(0, 0, (GLsizei)width, (GLsizei)height);
+	
 
 	gPerspectiveProjectionMatrix = perspective(45.0f, (GLfloat)width / (GLfloat)height, 0.1f, 100.0f);
 }

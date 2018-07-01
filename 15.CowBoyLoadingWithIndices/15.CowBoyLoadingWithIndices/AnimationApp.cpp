@@ -68,12 +68,34 @@ GLuint gVbo_index;
 GLuint gTextureSamplerUniform;
 
 GLuint gModelViewMatrixUniform, gProjectionMatrixUniform;
+
+GLuint gModelMatrixUniform, gViewMatrixUniform;
 GLuint gLdUniform, gKdUniform, gLightPositionUniform;
+
+
+GLuint La_uniform, Ld_uniform, Ls_uniform;
+GLuint Ka_uniform, Kd_uniform, Ks_uniform;
+GLuint material_shininess_uniform;
+//lighting details
+GLfloat lightAmbient[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+GLfloat lightDiffuse[] = { 1.0f,1.0f,1.0f,1.0f };
+GLfloat lightSpecular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+GLfloat lightPosition[] = { 100.0f, 100.0f, 100.0f, 1.0f };
+
+GLfloat material_ambient[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+GLfloat material_diffuse[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+GLfloat material_specular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+GLfloat material_shininess = 50.0f;
+
 
 GLuint gLKeyPressedUniform;
 
 GLuint gTexture;
+GLfloat zTranslation = -2.0f;
 
+GLfloat gAngle = 0.0f;
+bool gbAnimate;
+bool gbLight;
 
 int LoadGLTexture(GLuint*, TCHAR[]);
 
@@ -88,6 +110,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
 	void update(void);
 	void display(void);
 	void uninitialize(void);
+	void spin(void);
 
 	WNDCLASSEX wndclass;
 	HWND hwnd;
@@ -166,6 +189,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
 				if (gbEscapeKeyIsPressed == true)
 					bDone = true;
 			}
+			spin();
 			display();
 		}
 	}
@@ -181,6 +205,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 	void resize(int, int);
 	void ToggleFullscreen(void);
 	void uninitialize(void);
+	static bool bIsAKeyPressed = false;
+	static bool bIsLKeyPressed = false;
 
 	switch (iMsg)
 	{
@@ -194,6 +220,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 		return(0);
 	case WM_SIZE:
 		resize(LOWORD(lParam), HIWORD(lParam));
+		break;
+	case WM_CHAR:
+		switch (LOWORD(wParam))
+		{
+		case 'Z'://Z
+			zTranslation += 0.5f;
+			break;
+		case 'z'://z
+			zTranslation -= 0.5f;
+			break;
+		default:
+			break;
+		}
 		break;
 	case WM_KEYDOWN:
 		switch (wParam)
@@ -212,6 +251,26 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam)
 			{
 				ToggleFullscreen();
 				gbFullscreen = false;
+			}
+			break;
+		case 0x41:
+			if (bIsAKeyPressed == false) {
+				gbAnimate = true;
+				bIsAKeyPressed = true;
+			}
+			else {
+				gbAnimate = false;
+				bIsAKeyPressed = false;
+			}
+			break;
+		case 0x4c:
+			if (bIsLKeyPressed == false) {
+				gbLight = true;
+				bIsLKeyPressed = true;
+			}
+			else {
+				gbLight = false;
+				bIsLKeyPressed = false;
 			}
 			break;
 		default:
@@ -326,21 +385,31 @@ void initialize(void)
 	gVertexShaderObject = glCreateShader(GL_VERTEX_SHADER);
 
 	const GLchar *vertexShaderSourceCode =
-		"#version 430 core"\
-		"\n"\
-		"in vec3 vPosition;"\
+		"#version 440 core" \
+		"\n" \
+		"in vec4 vPosition;" \
+		"in vec3 vNormal;" \
 		"in vec2 vTexture0_coord;"\
-
-		"uniform mat4 u_mvp_matrix;"\
-
+		"uniform mat4 u_model_matrix;" \
+		"uniform mat4 u_view_matrix;" \
+		"uniform mat4 u_projection_matrix;" \
+		"uniform vec4 u_light_position;" \
+		"uniform int u_lighting_enabled;" \
+		"out vec3 transformed_normals;" \
+		"out vec3 light_direction;" \
+		"out vec3 viewer_vector;" \
 		"out vec2 out_Texture0_coord;"\
-		"out float pass_height;"\
-
 		"void main(void)" \
 		"{" \
-		"gl_Position=u_mvp_matrix * vec4(vPosition , 1.0);"
-		"out_Texture0_coord=vTexture0_coord;"
-		"pass_height = vPosition.y;"\
+		"if(u_lighting_enabled == 1)" \
+		"{" \
+		"vec4 eye_coordinates = u_view_matrix* u_model_matrix * vPosition;" \
+		"transformed_normals = mat3(u_view_matrix*u_model_matrix) * vNormal;" \
+		"light_direction = vec3(u_light_position) - eye_coordinates.xyz;" \
+		"viewer_vector = -eye_coordinates.xyz;" \
+		"}" \
+		"gl_Position = u_projection_matrix * u_view_matrix * u_model_matrix * vPosition;" \
+		"out_Texture0_coord=vTexture0_coord;"\
 		"}";
 
 	glShaderSource(gVertexShaderObject, 1, (const GLchar **)&vertexShaderSourceCode, NULL);
@@ -374,35 +443,44 @@ void initialize(void)
 	gFragmentShaderObject = glCreateShader(GL_FRAGMENT_SHADER);
 
 	const GLchar *fragmentShaderSourceCode =
-		"#version 430 core"\
-			"\n"\
-
-	"in vec2 out_Texture0_coord;"
-	"out vec4 FragColor;"
-	"uniform sampler2D u_texture0_sampler;"
-	"void main(void)" \
+		"#version 440 core" \
+		"\n" \
+		"in vec3 transformed_normals;" \
+		"in vec3 light_direction;" \
+		"in vec3 viewer_vector;" \
+		"in vec2 out_Texture0_coord;"\
+		"uniform vec3 u_La;" \
+		"uniform vec3 u_Ld;" \
+		"uniform vec3 u_Ls;" \
+		"uniform vec3 u_Ka;" \
+		"uniform vec3 u_Kd;" \
+		"uniform vec3 u_Ks;" \
+		"uniform float u_material_shininess;" \
+		"uniform int u_lighting_enabled;" \
+		"uniform sampler2D u_texture0_sampler;"
+		"out vec4 FragColor;" \
+		"void main(void)" \
 		"{" \
-	"FragColor=texture(u_texture0_sampler,out_Texture0_coord);" \
+		"vec3 phong_ads_color;"\
+		"if(u_lighting_enabled == 1)" \
+		"{" \
+		"vec3 normalized_transformed_normals = normalize(transformed_normals);" \
+		"vec3 normalized_light_direction = normalize(light_direction);" \
+		"vec3 normalized_viewer_vector = normalize(viewer_vector);" \
+		"float tn_dot_ld = max(dot(normalized_transformed_normals, normalized_light_direction), 0.0);" \
+		"vec3 ambient = u_La * u_Ka;" \
+		"vec3 diffuse = u_Ld * u_Kd * tn_dot_ld;" \
+		"vec3 reflection_vector = reflect(-normalized_light_direction, normalized_transformed_normals);" \
+		"vec3 specular = u_Ls * u_Ks * pow(max(dot(reflection_vector, normalized_viewer_vector),0.0), u_material_shininess);" \
+		"phong_ads_color = ambient + diffuse + specular;" \
+		"}" \
+		"else" \
+		"{" \
+		"phong_ads_color = vec3(1.0, 1.0, 1.0);" \
+		"}" \
+		//"FragColor = vec4(phong_ads_color, 1.0);" \"
+		"FragColor=texture(u_texture0_sampler,out_Texture0_coord)+vec4(phong_ads_color, 1.0);" \
 		"}";
-
-	//const GLchar *fragmentShaderSourceCode =
-	//	"const vec4 colour1 = vec4(0.0, 0.0, 0.0, 1.0);"\
-	//	"in float pass_height;"\
-	//	"in vec2 out_Texture0_coord;"
-	//	"uniform sampler2D u_texture0_sampler;"
-	//	"out vec4 FragColor;"\
-	//	/*"float smoothlyStep(float edge0, float edge1, float x) {"\
-	//	"float t = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);"\
-	//	"return t * t * (3.0 - 2.0 * t);"\
-	//	"};"\
-	//	*/
-	//	"void main(void) {"\
-	//	//"float fadeFactor = 1.0 - smoothlyStep(-50.0, 70.0, pass_height);"\
-	//			//"FragColor = mix( colour1,texture(u_texture0_sampler,out_Texture0_coord), fadeFactor);"\"
-	//	"FragColor = texture(u_texture0_sampler,out_Texture0_coord);"\
-	//	"}";
-
-
 
 	glShaderSource(gFragmentShaderObject, 1, (const GLchar **)&fragmentShaderSourceCode, NULL);
 
@@ -473,15 +551,20 @@ void initialize(void)
 	gTextureSamplerUniform = glGetUniformLocation(gShaderProgramObject, "u_texture0_sampler");
 
 
-	// get uniform locations
-	gModelViewMatrixUniform = glGetUniformLocation(gShaderProgramObject, "u_model_view_matrix");
+	gModelMatrixUniform = glGetUniformLocation(gShaderProgramObject, "u_model_matrix");
+	gViewMatrixUniform = glGetUniformLocation(gShaderProgramObject, "u_view_matrix");
 	gProjectionMatrixUniform = glGetUniformLocation(gShaderProgramObject, "u_projection_matrix");
+	La_uniform = glGetUniformLocation(gShaderProgramObject, "u_La");
+	Ld_uniform = glGetUniformLocation(gShaderProgramObject, "u_Ld");
+	Ls_uniform = glGetUniformLocation(gShaderProgramObject, "u_Ls");
+	gLightPositionUniform = glGetUniformLocation(gShaderProgramObject, "u_light_position");
 
-	gLKeyPressedUniform = glGetUniformLocation(gShaderProgramObject, "u_LKeyPressed");
-
-	gLdUniform = glGetUniformLocation(gShaderProgramObject, "u_Ld");
-	gKdUniform = glGetUniformLocation(gShaderProgramObject, "u_Kd");
-	gLightPositionUniform = glGetUniformLocation(gShaderProgramObject, "u_light_position");;
+	//material ambient color intensity
+	Ka_uniform = glGetUniformLocation(gShaderProgramObject, "u_Ka");
+	Kd_uniform = glGetUniformLocation(gShaderProgramObject, "u_Kd");
+	Ks_uniform = glGetUniformLocation(gShaderProgramObject, "u_Ks");
+	//shininess of material
+	material_shininess_uniform = glGetUniformLocation(gShaderProgramObject, "u_material_shininess");
 
 	//************************************************************************************************************************
 
@@ -580,12 +663,39 @@ void display(void)
 
 	glUseProgram(gShaderProgramObject);
 
-	mat4 modelViewMatrix = mat4::identity();  //initialize model view matrix
-	modelViewMatrix = translate(0.0f, -4.0f, -14.0f); //translate function return matrix with translate parameter
-	mat4 modelViewProjectionMatrix = mat4::identity();
-	modelViewProjectionMatrix = gPerspectiveProjectionMatrix*modelViewMatrix;
+	if (gbLight == true) {
+		glUniform1i(gLKeyPressedUniform, 1);
+		//setting light's properties
+		glUniform3fv(La_uniform, 1, lightAmbient);
+		glUniform3fv(Ld_uniform, 1, lightDiffuse);
+		glUniform3fv(Ls_uniform, 1, lightSpecular);
+		glUniform4fv(gLightPositionUniform, 1, lightPosition);
 
-	glUniformMatrix4fv(gMVPUniform, 1, GL_FALSE, modelViewProjectionMatrix);
+		//set material properties
+		glUniform3fv(Ka_uniform, 1, material_ambient);
+		glUniform3fv(Kd_uniform, 1, material_diffuse);
+		glUniform3fv(Ks_uniform, 1, material_specular);
+		glUniform1f(material_shininess_uniform, material_shininess);
+	}
+	else {
+		glUniform1i(gLKeyPressedUniform, 0);
+	}
+
+
+	mat4 modelMatrix = mat4::identity();
+	mat4 viewMatrix = mat4::identity();
+	mat4 rotationMatrix = mat4::identity();
+
+	modelMatrix = vmath::translate(0.0f, -4.0f, zTranslation);
+	rotationMatrix = vmath::rotate(gAngle, 0.0f, 1.0f, 0.0f); //arbitory all axes rotation
+
+	modelMatrix = modelMatrix * rotationMatrix;
+
+	// Pass above matrices to shaders
+
+	glUniformMatrix4fv(gModelMatrixUniform, 1, GL_FALSE, modelMatrix);
+	glUniformMatrix4fv(gViewMatrixUniform, 1, GL_FALSE, viewMatrix);
+	glUniformMatrix4fv(gProjectionMatrixUniform, 1, GL_FALSE, gPerspectiveProjectionMatrix);
 
 	glBindVertexArray(gVao);
 
@@ -716,4 +826,11 @@ int LoadGLTexture(GLuint *texture, TCHAR imageResourceId[])
 		DeleteObject(hBitmap); //delete unwanted bitmap handle
 	}
 	return(iStatus);
+}
+
+void spin() {
+	gAngle += 0.05f;
+	if (gAngle >= 360.0f) {
+		gAngle = gAngle - 360.0f;
+	}
 }
