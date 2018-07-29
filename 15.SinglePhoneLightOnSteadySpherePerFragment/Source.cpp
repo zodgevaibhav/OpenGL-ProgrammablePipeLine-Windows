@@ -2,7 +2,6 @@
 #include <stdio.h> // for FILE I/O
 
 #include <gl\glew.h> // for GLSL extensions IMPORTANT : This Line Should Be Before #include<gl\gl.h> And #include<gl\glu.h>
-#include<gl\glu.h>
 
 #include <gl/GL.h>
 
@@ -13,7 +12,7 @@
 #pragma comment(lib,"glew32.lib")
 #pragma comment(lib,"opengl32.lib")
 
-//#pragma comment(lib,"Sphere.lib")
+Sphere *sphere = new Sphere();
 
 #define WIN_WIDTH 800
 #define WIN_HEIGHT 600
@@ -88,8 +87,6 @@ GLfloat material_ambient[] = { 0.0f,0.0f,0.0f,1.0f };
 GLfloat material_diffuse[] = { 1.0f,1.0f,1.0f,1.0f };
 GLfloat material_specular[] = { 1.0f,1.0f,1.0f,1.0f };
 GLfloat material_shininess = 50.0f;
-Sphere *sphere = new Sphere();
-
 
 // WinMain()
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, int iCmdShow)
@@ -377,34 +374,19 @@ void initialize(void)
 		"uniform mat4 u_model_matrix;" \
 		"uniform mat4 u_view_matrix;" \
 		"uniform mat4 u_projection_matrix;" \
-		"uniform int u_lighting_enabled;" \
-		"uniform vec3 u_La;" \
-		"uniform vec3 u_Ld;" \
-		"uniform vec3 u_Ls;" \
 		"uniform vec4 u_light_position;" \
-		"uniform vec3 u_Ka;" \
-		"uniform vec3 u_Kd;" \
-		"uniform vec3 u_Ks;" \
-		"uniform float u_material_shininess;" \
-		"out vec3 phong_ads_color;" \
+		"uniform int u_lighting_enabled;" \
+		"out vec3 transformed_normals;" \
+		"out vec3 light_direction;" \
+		"out vec3 viewer_vector;" \
 		"void main(void)" \
 		"{" \
 		"if(u_lighting_enabled==1)" \
 		"{" \
 		"vec4 eye_coordinates=u_view_matrix * u_model_matrix * vPosition;" \
-		"vec3 transformed_normals=normalize(mat3(u_view_matrix * u_model_matrix) * vNormal);" \
-		"vec3 light_direction = normalize(vec3(u_light_position) - eye_coordinates.xyz);" \
-		"float tn_dot_ld = max(dot(transformed_normals, light_direction),0.0);" \
-		"vec3 ambient = u_La * u_Ka;" \
-		"vec3 diffuse = u_Ld * u_Kd * tn_dot_ld;" \
-		"vec3 reflection_vector = reflect(-light_direction, transformed_normals);" \
-		"vec3 viewer_vector = normalize(-eye_coordinates.xyz);" \
-		"vec3 specular = u_Ls * u_Ks * pow(max(dot(reflection_vector, viewer_vector), 0.0), u_material_shininess);" \
-		"phong_ads_color=ambient + diffuse + specular;" \
-		"}" \
-		"else" \
-		"{" \
-		"phong_ads_color = vec3(1.0, 1.0, 1.0);" \
+		"transformed_normals=mat3(u_view_matrix * u_model_matrix) * vNormal;" \
+		"light_direction = vec3(u_light_position) - eye_coordinates.xyz;" \
+		"viewer_vector = -eye_coordinates.xyz;" \
 		"}" \
 		"gl_Position=u_projection_matrix * u_view_matrix * u_model_matrix * vPosition;" \
 		"}";
@@ -443,10 +425,37 @@ void initialize(void)
 	const GLchar *fragmentShaderSourceCode =
 		"#version 130" \
 		"\n" \
-		"in vec3 phong_ads_color;" \
+		"in vec3 transformed_normals;" \
+		"in vec3 light_direction;" \
+		"in vec3 viewer_vector;" \
 		"out vec4 FragColor;" \
+		"uniform vec3 u_La;" \
+		"uniform vec3 u_Ld;" \
+		"uniform vec3 u_Ls;" \
+		"uniform vec3 u_Ka;" \
+		"uniform vec3 u_Kd;" \
+		"uniform vec3 u_Ks;" \
+		"uniform float u_material_shininess;" \
+		"uniform int u_lighting_enabled;" \
 		"void main(void)" \
 		"{" \
+		"vec3 phong_ads_color;" \
+		"if(u_lighting_enabled==1)" \
+		"{" \
+		"vec3 normalized_transformed_normals=normalize(transformed_normals);" \
+		"vec3 normalized_light_direction=normalize(light_direction);" \
+		"vec3 normalized_viewer_vector=normalize(viewer_vector);" \
+		"vec3 ambient = u_La * u_Ka;" \
+		"float tn_dot_ld = max(dot(normalized_transformed_normals, normalized_light_direction),0.0);" \
+		"vec3 diffuse = u_Ld * u_Kd * tn_dot_ld;" \
+		"vec3 reflection_vector = reflect(-normalized_light_direction, normalized_transformed_normals);" \
+		"vec3 specular = u_Ls * u_Ks * pow(max(dot(reflection_vector, normalized_viewer_vector), 0.0), u_material_shininess);" \
+		"phong_ads_color=ambient + diffuse + specular;" \
+		"}" \
+		"else" \
+		"{" \
+		"phong_ads_color = vec3(1.0, 1.0, 1.0);" \
+		"}" \
 		"FragColor = vec4(phong_ads_color, 1.0);" \
 		"}";
 
